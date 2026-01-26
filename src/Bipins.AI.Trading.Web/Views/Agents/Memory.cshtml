@@ -1,0 +1,62 @@
+@model Bipins.AI.Trading.Web.Controllers.AgentMemoryViewModel
+@{
+    ViewData["Title"] = "Agent Memory";
+}
+
+<h1>@ViewData["Title"]</h1>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Vector Memory Status</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">Collection Name</dt>
+                    <dd class="col-sm-9">@Model.CollectionName</dd>
+                    
+                    <dt class="col-sm-3">Status</dt>
+                    <dd class="col-sm-9">
+                        @if (Model.CollectionExists)
+                        {
+                            <span class="badge bg-success">Exists</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning">Not Created</span>
+                            <p class="text-muted mt-2">Collection will be created automatically when first scenario is stored.</p>
+                        }
+                    </dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>About Agent Memory</h5>
+            </div>
+            <div class="card-body">
+                <p>The agent uses vector memory (Qdrant) to store and retrieve trading scenarios:</p>
+                <ul>
+                    <li><strong>Storage:</strong> Each trading decision is stored as an embedding with market conditions, decision, and outcome</li>
+                    <li><strong>Retrieval:</strong> When making new decisions, the agent searches for similar past scenarios</li>
+                    <li><strong>Learning:</strong> The agent learns from past successes and failures to improve future decisions</li>
+                </ul>
+                <p class="text-muted">
+                    <strong>Note:</strong> Memory is stored in Qdrant vector database. Ensure Qdrant is running (docker-compose up -d in docker/ folder).
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <a asp-action="Index" class="btn btn-secondary">Back to Agent</a>
+    </div>
+</div>

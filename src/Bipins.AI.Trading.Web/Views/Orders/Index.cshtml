@@ -1,0 +1,43 @@
+@model List<Bipins.AI.Trading.Domain.Entities.Order>
+@{
+    ViewData["Title"] = "Orders";
+}
+
+<h2>Orders</h2>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Order ID</th>
+                    <th>Symbol</th>
+                    <th>Side</th>
+                    <th>Type</th>
+                    <th>Quantity</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var order in Model)
+                {
+                    <tr>
+                        <td>@order.ClientOrderId</td>
+                        <td>@order.Symbol.Value</td>
+                        <td>@order.Side</td>
+                        <td>@order.Type</td>
+                        <td>@order.Quantity.Value</td>
+                        <td>
+                            <span class="badge bg-@(order.Status == Bipins.AI.Trading.Domain.Entities.OrderStatus.Filled ? "success" : 
+                                order.Status == Bipins.AI.Trading.Domain.Entities.OrderStatus.Rejected ? "danger" : "warning")">
+                                @order.Status
+                            </span>
+                        </td>
+                        <td>@order.CreatedAt</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

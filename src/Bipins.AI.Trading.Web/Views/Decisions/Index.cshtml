@@ -1,0 +1,46 @@
+@model List<Bipins.AI.Trading.Domain.Entities.TradeDecision>
+@{
+    ViewData["Title"] = "Decisions";
+}
+
+<h2>Decisions</h2>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="mb-3">
+            <a asp-action="Export" class="btn btn-primary">Export CSV</a>
+        </div>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>Timeframe</th>
+                    <th>Candle Time</th>
+                    <th>Action</th>
+                    <th>Quantity %</th>
+                    <th>Confidence</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var decision in Model)
+                {
+                    <tr>
+                        <td>@decision.Symbol.Value</td>
+                        <td>@decision.Timeframe.Value</td>
+                        <td>@decision.CandleTimestamp</td>
+                        <td>
+                            <span class="badge bg-@(decision.Action == Bipins.AI.Trading.Domain.Entities.TradeAction.Buy ? "success" : 
+                                decision.Action == Bipins.AI.Trading.Domain.Entities.TradeAction.Sell ? "danger" : "secondary")">
+                                @decision.Action
+                            </span>
+                        </td>
+                        <td>@(decision.QuantityPercent?.ToString("F2") ?? "-")%</td>
+                        <td>@decision.Confidence.ToString("F2")</td>
+                        <td>@decision.Rationale</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

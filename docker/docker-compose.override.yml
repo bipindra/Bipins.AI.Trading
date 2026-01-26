@@ -1,0 +1,20 @@
+# Development overrides for docker-compose
+# This file is automatically loaded by docker-compose
+# Use this for local development customizations
+
+version: '3.8'
+
+services:
+  web:
+    # Override environment for development
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      # Uncomment to enable hot reload (requires .NET watch)
+      # - DOTNET_USE_POLLING_FILE_WATCHER=true
+    # Mount source code for development (if using volume mounts for hot reload)
+    # volumes:
+    #   - ../src:/src:ro
+    ports:
+      - "8080:8080"
+      - "5000:8080"  # Additional port mapping for compatibility

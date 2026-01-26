@@ -1,0 +1,118 @@
+@model Bipins.AI.Trading.Domain.Entities.Strategy
+@using Bipins.AI.Trading.Domain.Entities
+@{
+    ViewData["Title"] = "Strategy Details";
+}
+
+<h2>@Model.Name</h2>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Strategy Information</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Description:</strong> @Model.Description</p>
+                <p><strong>Timeframe:</strong> @Model.Timeframe.Value</p>
+                <p><strong>Enabled:</strong> 
+                    <span class="badge bg-@(Model.Enabled ? "success" : "secondary")">
+                        @(Model.Enabled ? "Yes" : "No")
+                    </span>
+                </p>
+                <p><strong>Created:</strong> @Model.CreatedAt</p>
+                @if (Model.UpdatedAt.HasValue)
+                {
+                    <p><strong>Updated:</strong> @Model.UpdatedAt.Value</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <h4>Indicator Alerts</h4>
+        @if (Model.Alerts.Any())
+        {
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Indicator</th>
+                        <th>Condition</th>
+                        <th>Target Field</th>
+                        <th>Threshold</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var alert in Model.Alerts.OrderBy(a => a.Order))
+                    {
+                        <tr>
+                            <td>@alert.IndicatorType</td>
+                            <td>@alert.ConditionType</td>
+                            <td>@(alert.TargetField ?? "N/A")</td>
+                            <td>@(alert.Threshold?.ToString("F2") ?? "N/A")</td>
+                            <td>
+                                <span class="badge bg-@(alert.Action == TradeAction.Buy ? "success" : alert.Action == TradeAction.Sell ? "danger" : "secondary")">
+                                    @alert.Action
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p class="text-muted">No alerts configured</p>
+        }
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <h4>Alert Combinations</h4>
+        @if (Model.Conditions.Any())
+        {
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Left Alert</th>
+                        <th>Operator</th>
+                        <th>Right Alert</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var condition in Model.Conditions.OrderBy(c => c.Order))
+                    {
+                        var leftAlert = Model.Alerts.FirstOrDefault(a => a.Id == condition.LeftAlertId);
+                        var rightAlert = Model.Alerts.FirstOrDefault(a => a.Id == condition.RightAlertId);
+                        <tr>
+                            <td>@(leftAlert != null ? $"{leftAlert.IndicatorType} {leftAlert.ConditionType}" : "N/A")</td>
+                            <td>@condition.Operator</td>
+                            <td>@(rightAlert != null ? $"{rightAlert.IndicatorType} {rightAlert.ConditionType}" : "N/A")</td>
+                            <td>
+                                <span class="badge bg-@(condition.Action == TradeAction.Buy ? "success" : condition.Action == TradeAction.Sell ? "danger" : "secondary")">
+                                    @condition.Action
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p class="text-muted">No combinations configured</p>
+        }
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Edit</a>
+        <a asp-action="Index" class="btn btn-secondary">Back to List</a>
+    </div>
+</div>

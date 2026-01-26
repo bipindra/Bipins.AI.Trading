@@ -1,0 +1,162 @@
+@{
+    ViewData["Title"] = "Charts";
+    var symbols = ViewBag.Symbols as string[] ?? new[] { "SPY" };
+    var defaultSymbol = ViewBag.DefaultSymbol as string ?? "SPY";
+    var defaultTimeframe = ViewBag.DefaultTimeframe as string ?? "5m";
+    var timeframes = ViewBag.Timeframes as string[] ?? new[] { "1m", "5m", "15m", "1h", "1d" };
+}
+
+<div class="container-fluid mt-3">
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Stock Charts</h5>
+                    <div class="d-flex gap-2">
+                        <select id="symbolSelect" class="form-select form-select-sm" style="width: auto;">
+                            @foreach (var symbol in symbols)
+                            {
+                                <option value="@symbol" selected="@(symbol == defaultSymbol)">@symbol</option>
+                            }
+                        </select>
+                        <select id="timeframeSelect" class="form-select form-select-sm" style="width: auto;">
+                            @foreach (var tf in timeframes)
+                            {
+                                <option value="@tf" selected="@(tf == defaultTimeframe)">@tf</option>
+                            }
+                        </select>
+                        <select id="timeRangeSelect" class="form-select form-select-sm" style="width: auto;">
+                            <option value="1D" selected>1 Day</option>
+                            <option value="1W">1 Week</option>
+                            <option value="1M">1 Month</option>
+                            <option value="3M">3 Months</option>
+                            <option value="1Y">1 Year</option>
+                            <option value="ALL">All</option>
+                        </select>
+                        <div class="form-check form-switch align-self-center">
+                            <input class="form-check-input" type="checkbox" id="autoUpdateCheck" checked>
+                            <label class="form-check-label" for="autoUpdateCheck">Auto Update</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="chartContainer" style="height: 600px; width: 100%;">
+                        <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading chart...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="showMacd" checked>
+                            <label class="form-check-label" for="showMacd">MACD</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="showRsi" checked>
+                            <label class="form-check-label" for="showRsi">RSI</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="showMA">
+                            <label class="form-check-label" for="showMA">Moving Average (20)</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="showVolume" checked>
+                            <label class="form-check-label" for="showVolume">Volume</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/charts.css" />
+}
+
+@section Scripts {
+    <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+    <script>
+        // Wait for TradingView library to load, then load our chart script
+        function loadChartScript() {
+            if (typeof LightweightCharts === 'undefined') {
+                console.error('TradingView Lightweight Charts library failed to load');
+                const container = document.getElementById('chartContainer');
+                if (container) {
+                    container.innerHTML = '<div class="alert alert-danger m-3">Chart library failed to load. Please check your internet connection and refresh the page.</div>';
+                }
+                return;
+            }
+
+            // Verify the library has the expected API
+            if (typeof LightweightCharts.createChart !== 'function') {
+                console.error('LightweightCharts.createChart is not available');
+                const container = document.getElementById('chartContainer');
+                if (container) {
+                    container.innerHTML = '<div class="alert alert-danger m-3">Chart library API not available. Please refresh the page.</div>';
+                }
+                return;
+            }
+
+            // Load our chart script
+            const script = document.createElement('script');
+            script.src = '/js/charts.js';
+            script.onload = function() {
+                if (typeof ChartManager === 'undefined') {
+                    console.error('ChartManager class not found after loading script');
+                    const container = document.getElementById('chartContainer');
+                    if (container) {
+                        container.innerHTML = '<div class="alert alert-danger m-3">Chart manager script failed to load. Please refresh the page.</div>';
+                    }
+                    return;
+                }
+
+                try {
+                    const chartManager = new ChartManager({
+                        containerId: 'chartContainer',
+                        symbolSelectId: 'symbolSelect',
+                        timeframeSelectId: 'timeframeSelect',
+                        timeRangeSelectId: 'timeRangeSelect',
+                        autoUpdateCheckId: 'autoUpdateCheck',
+                        showMacdId: 'showMacd',
+                        showRsiId: 'showRsi',
+                        showMAId: 'showMA',
+                        showVolumeId: 'showVolume',
+                        defaultSymbol: '@defaultSymbol',
+                        defaultTimeframe: '@defaultTimeframe'
+                    });
+                    
+                    chartManager.init();
+                } catch (error) {
+                    console.error('Error initializing chart:', error);
+                    const container = document.getElementById('chartContainer');
+                    if (container) {
+                        container.innerHTML = '<div class="alert alert-danger m-3">Error initializing chart: ' + error.message + '</div>';
+                    }
+                }
+            };
+            script.onerror = function() {
+                console.error('Failed to load charts.js');
+                const container = document.getElementById('chartContainer');
+                if (container) {
+                    container.innerHTML = '<div class="alert alert-danger m-3">Failed to load chart script. Please refresh the page.</div>';
+                }
+            };
+            document.body.appendChild(script);
+        }
+
+        // Initialize when library is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                // Wait a bit for the library script to load
+                setTimeout(loadChartScript, 100);
+            });
+        } else {
+            // DOM is already ready, wait for library
+            setTimeout(loadChartScript, 100);
+        }
+    </script>
+}

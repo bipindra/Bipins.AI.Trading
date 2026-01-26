@@ -1,0 +1,75 @@
+# Build artifacts
+**/bin/
+**/obj/
+**/out/
+**/publish/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+**/trading.db*
+
+# Logs
+logs/
+**/*.log
+
+# IDE and editor files
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Test files
+**/Tests/
+**/*Tests/
+**/*Test/
+**/*.Tests.csproj
+
+# Node modules (if any)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+appsettings.*.json
+!appsettings.json
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# NuGet packages (will be restored in container)
+**/packages/
+*.nupkg
+
+# Coverage reports
+coverage/
+*.coverage
+*.coveragexml

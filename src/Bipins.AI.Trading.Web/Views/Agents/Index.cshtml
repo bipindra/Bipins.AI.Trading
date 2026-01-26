@@ -1,0 +1,94 @@
+@model Bipins.AI.Trading.Web.Controllers.AgentStatusViewModel
+@{
+    ViewData["Title"] = "AI Agent";
+}
+
+<h1>@ViewData["Title"]</h1>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Agent Status</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-4">Provider</dt>
+                    <dd class="col-sm-8">@Model.Provider</dd>
+                    
+                    <dt class="col-sm-4">Status</dt>
+                    <dd class="col-sm-8">
+                        @if (Model.IsConfigured)
+                        {
+                            <span class="badge bg-success">Configured</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning">Not Configured</span>
+                        }
+                    </dd>
+                    
+                    <dt class="col-sm-4">Model</dt>
+                    <dd class="col-sm-8">@Model.Model</dd>
+                </dl>
+                
+                @if (!Model.IsConfigured)
+                {
+                    <div class="alert alert-warning">
+                        <strong>LLM not configured.</strong> Please configure your LLM provider API key in appsettings.json or via Settings page.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Agent Capabilities</h5>
+            </div>
+            <div class="card-body">
+                <ul>
+                    <li><strong>Autonomous Decision-Making:</strong> Uses LLM to analyze market conditions and make trading decisions</li>
+                    <li><strong>Tool Use:</strong> Can gather market data, calculate indicators, check portfolio status</li>
+                    <li><strong>RAG Pattern:</strong> Retrieves similar past trading scenarios from vector memory</li>
+                    <li><strong>Learning:</strong> Stores decisions and outcomes for future reference</li>
+                    <li><strong>Multi-Step Reasoning:</strong> Plans and executes complex analysis</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Actions</h5>
+            </div>
+            <div class="card-body">
+                <a asp-action="TestDecision" class="btn btn-primary me-2">Test Decision</a>
+                <a asp-action="Memory" class="btn btn-secondary">View Memory</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>How It Works</h5>
+            </div>
+            <div class="card-body">
+                <ol>
+                    <li><strong>Context Gathering:</strong> Agent collects market data, portfolio status, and technical indicators</li>
+                    <li><strong>RAG Retrieval:</strong> Searches vector database for similar past trading scenarios</li>
+                    <li><strong>Reasoning:</strong> LLM analyzes context and similar scenarios to generate a trading plan</li>
+                    <li><strong>Decision:</strong> LLM makes final decision (Buy/Sell/Hold) with confidence and rationale</li>
+                    <li><strong>Storage:</strong> Decision and context stored as embedding in Qdrant for future learning</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>

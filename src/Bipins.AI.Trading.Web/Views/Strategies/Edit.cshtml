@@ -1,0 +1,406 @@
+@model Bipins.AI.Trading.Domain.Entities.Strategy
+@using Bipins.AI.Trading.Domain.Entities
+@{
+    ViewData["Title"] = "Edit Strategy";
+}
+
+<h2>Edit Strategy</h2>
+
+<form asp-action="Edit" method="post" id="strategyForm">
+    <input type="hidden" asp-for="Id" />
+    
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label asp-for="Name" class="form-label">Name</label>
+                <input asp-for="Name" class="form-control" required />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+            
+            <div class="mb-3">
+                <label asp-for="Description" class="form-label">Description</label>
+                <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+            </div>
+            
+            <div class="mb-3">
+                <label asp-for="Timeframe" class="form-label">Timeframe</label>
+                <select asp-for="Timeframe.Value" class="form-select" id="timeframeSelect">
+                    <option value="1m">1 Minute</option>
+                    <option value="5m">5 Minutes</option>
+                    <option value="15m">15 Minutes</option>
+                    <option value="1h">1 Hour</option>
+                    <option value="1d">1 Day</option>
+                </select>
+            </div>
+            
+            <div class="mb-3">
+                <div class="form-check">
+                    <input asp-for="Enabled" class="form-check-input" type="checkbox" />
+                    <label asp-for="Enabled" class="form-check-label">Enabled</label>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <h4>Indicator Alerts</h4>
+            <div id="alertsContainer">
+                @for (int i = 0; i < Model.Alerts.Count; i++)
+                {
+                    var alert = Model.Alerts[i];
+                    <div class="card mb-3" id="alert-@i">
+                        <div class="card-body">
+                            <h6>Alert @(i + 1)</h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label class="form-label">Indicator</label>
+                                    <select class="form-select indicator-type" onchange="updateAlertFields('alert-@i')">
+                                        <option value="MACD" selected="@(alert.IndicatorType == IndicatorType.MACD)">MACD</option>
+                                        <option value="RSI" selected="@(alert.IndicatorType == IndicatorType.RSI)">RSI</option>
+                                        <option value="Stochastic" selected="@(alert.IndicatorType == IndicatorType.Stochastic)">Stochastic</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Condition</label>
+                                    <select class="form-select condition-type">
+                                        <option value="RisesAbove" selected="@(alert.ConditionType == AlertConditionType.RisesAbove)">Rises Above</option>
+                                        <option value="FallsBelow" selected="@(alert.ConditionType == AlertConditionType.FallsBelow)">Falls Below</option>
+                                        <option value="CrossesAbove" selected="@(alert.ConditionType == AlertConditionType.CrossesAbove)">Crosses Above</option>
+                                        <option value="CrossesBelow" selected="@(alert.ConditionType == AlertConditionType.CrossesBelow)">Crosses Below</option>
+                                        <option value="Equals" selected="@(alert.ConditionType == AlertConditionType.Equals)">Equals</option>
+                                        <option value="GreaterThan" selected="@(alert.ConditionType == AlertConditionType.GreaterThan)">Greater Than</option>
+                                        <option value="LessThan" selected="@(alert.ConditionType == AlertConditionType.LessThan)">Less Than</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Target Field</label>
+                                    <select class="form-select target-field" id="alert-@i-target">
+                                        <option value="">N/A</option>
+                                        @if (alert.IndicatorType == IndicatorType.MACD)
+                                        {
+                                            <option value="MACD" selected="@(alert.TargetField == "MACD")">MACD</option>
+                                            <option value="Signal" selected="@(alert.TargetField == "Signal")">Signal</option>
+                                            <option value="Histogram" selected="@(alert.TargetField == "Histogram")">Histogram</option>
+                                        }
+                                        else if (alert.IndicatorType == IndicatorType.Stochastic)
+                                        {
+                                            <option value="PercentK" selected="@(alert.TargetField == "PercentK")">%K</option>
+                                            <option value="PercentD" selected="@(alert.TargetField == "PercentD")">%D</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Threshold</label>
+                                    <input type="number" class="form-control threshold" step="0.01" value="@alert.Threshold" />
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Action</label>
+                                    <select class="form-select action">
+                                        <option value="Buy" selected="@(alert.Action == TradeAction.Buy)">Buy</option>
+                                        <option value="Sell" selected="@(alert.Action == TradeAction.Sell)">Sell</option>
+                                        <option value="Hold" selected="@(alert.Action == TradeAction.Hold)">Hold</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-danger mt-2" onclick="removeAlert('alert-@i')">Remove</button>
+                        </div>
+                    </div>
+                }
+            </div>
+            <button type="button" class="btn btn-secondary mt-2" onclick="addAlert()">Add Alert</button>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <h4>Alert Combinations</h4>
+            <div id="conditionsContainer">
+                @for (int i = 0; i < Model.Conditions.Count; i++)
+                {
+                    var condition = Model.Conditions[i];
+                    <div class="card mb-3" id="condition-@i">
+                        <div class="card-body">
+                            <h6>Combination @(i + 1)</h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label class="form-label">Left Alert</label>
+                                    <select class="form-select left-alert">
+                                        <option value="">Select Alert</option>
+                                        @foreach (var alert in Model.Alerts)
+                                        {
+                                            <option value="@alert.Id" selected="@(condition.LeftAlertId == alert.Id)">@alert.IndicatorType @alert.ConditionType</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Operator</label>
+                                    <select class="form-select operator">
+                                        <option value="And" selected="@(condition.Operator == ConditionOperator.And)">AND</option>
+                                        <option value="Or" selected="@(condition.Operator == ConditionOperator.Or)">OR</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Right Alert</label>
+                                    <select class="form-select right-alert">
+                                        <option value="">Select Alert</option>
+                                        @foreach (var alert in Model.Alerts)
+                                        {
+                                            <option value="@alert.Id" selected="@(condition.RightAlertId == alert.Id)">@alert.IndicatorType @alert.ConditionType</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Action</label>
+                                    <select class="form-select action">
+                                        <option value="Buy" selected="@(condition.Action == TradeAction.Buy)">Buy</option>
+                                        <option value="Sell" selected="@(condition.Action == TradeAction.Sell)">Sell</option>
+                                        <option value="Hold" selected="@(condition.Action == TradeAction.Hold)">Hold</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-sm btn-danger mt-4" onclick="removeCondition('condition-@i')">Remove</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+            <button type="button" class="btn btn-secondary mt-2" onclick="addCondition()">Add Combination</button>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <button type="submit" class="btn btn-primary">Save Strategy</button>
+            <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+        </div>
+    </div>
+</form>
+
+<!-- Hidden fields for alerts and conditions -->
+<input type="hidden" id="alertsJson" name="alertsJson" />
+<input type="hidden" id="conditionsJson" name="conditionsJson" />
+
+@section Scripts {
+    <script>
+        let alertCounter = @Model.Alerts.Count;
+        let conditionCounter = @Model.Conditions.Count;
+        const alerts = [];
+        const conditions = [];
+        
+        // Initialize existing alerts
+        @for (int i = 0; i < Model.Alerts.Count; i++)
+        {
+            <text>
+            alerts.push({ id: 'alert-@i' });
+            </text>
+        }
+        
+        // Initialize existing conditions
+        @for (int i = 0; i < Model.Conditions.Count; i++)
+        {
+            <text>
+            conditions.push({ id: 'condition-@i' });
+            </text>
+        }
+        
+        function addAlert() {
+            const alertId = 'alert-' + alertCounter++;
+            const alertHtml = `
+                <div class="card mb-3" id="${alertId}">
+                    <div class="card-body">
+                        <h6>Alert ${alertCounter}</h6>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label class="form-label">Indicator</label>
+                                <select class="form-select indicator-type" onchange="updateAlertFields('${alertId}')">
+                                    <option value="MACD">MACD</option>
+                                    <option value="RSI">RSI</option>
+                                    <option value="Stochastic">Stochastic</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Condition</label>
+                                <select class="form-select condition-type">
+                                    <option value="RisesAbove">Rises Above</option>
+                                    <option value="FallsBelow">Falls Below</option>
+                                    <option value="CrossesAbove">Crosses Above</option>
+                                    <option value="CrossesBelow">Crosses Below</option>
+                                    <option value="Equals">Equals</option>
+                                    <option value="GreaterThan">Greater Than</option>
+                                    <option value="LessThan">Less Than</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Target Field</label>
+                                <select class="form-select target-field" id="${alertId}-target">
+                                    <option value="">N/A</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Threshold</label>
+                                <input type="number" class="form-control threshold" step="0.01" />
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Action</label>
+                                <select class="form-select action">
+                                    <option value="Buy">Buy</option>
+                                    <option value="Sell">Sell</option>
+                                    <option value="Hold">Hold</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-danger mt-2" onclick="removeAlert('${alertId}')">Remove</button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('alertsContainer').insertAdjacentHTML('beforeend', alertHtml);
+            alerts.push({ id: alertId });
+            updateConditionAlertOptions();
+        }
+        
+        function updateAlertFields(alertId) {
+            const indicatorType = document.querySelector(`#${alertId} .indicator-type`).value;
+            const targetField = document.querySelector(`#${alertId}-target`);
+            
+            targetField.innerHTML = '<option value="">N/A</option>';
+            
+            if (indicatorType === 'MACD') {
+                targetField.innerHTML += '<option value="MACD">MACD</option>';
+                targetField.innerHTML += '<option value="Signal">Signal</option>';
+                targetField.innerHTML += '<option value="Histogram">Histogram</option>';
+            } else if (indicatorType === 'Stochastic') {
+                targetField.innerHTML += '<option value="PercentK">%K</option>';
+                targetField.innerHTML += '<option value="PercentD">%D</option>';
+            }
+        }
+        
+        function removeAlert(alertId) {
+            document.getElementById(alertId).remove();
+            alerts.splice(alerts.findIndex(a => a.id === alertId), 1);
+            updateConditionAlertOptions();
+        }
+        
+        function addCondition() {
+            const conditionId = 'condition-' + conditionCounter++;
+            const conditionHtml = `
+                <div class="card mb-3" id="${conditionId}">
+                    <div class="card-body">
+                        <h6>Combination ${conditionCounter}</h6>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label class="form-label">Left Alert</label>
+                                <select class="form-select left-alert">
+                                    <option value="">Select Alert</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Operator</label>
+                                <select class="form-select operator">
+                                    <option value="And">AND</option>
+                                    <option value="Or">OR</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Right Alert</label>
+                                <select class="form-select right-alert">
+                                    <option value="">Select Alert</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Action</label>
+                                <select class="form-select action">
+                                    <option value="Buy">Buy</option>
+                                    <option value="Sell">Sell</option>
+                                    <option value="Hold">Hold</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="button" class="btn btn-sm btn-danger mt-4" onclick="removeCondition('${conditionId}')">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('conditionsContainer').insertAdjacentHTML('beforeend', conditionHtml);
+            conditions.push({ id: conditionId });
+            updateConditionAlertOptions();
+        }
+        
+        function removeCondition(conditionId) {
+            document.getElementById(conditionId).remove();
+            conditions.splice(conditions.findIndex(c => c.id === conditionId), 1);
+        }
+        
+        function updateConditionAlertOptions() {
+            const alertOptions = alerts.map((a, index) => {
+                const alertCard = document.getElementById(a.id);
+                if (!alertCard) return '';
+                const indicatorType = alertCard.querySelector('.indicator-type')?.value || '';
+                const conditionType = alertCard.querySelector('.condition-type')?.value || '';
+                return `<option value="${a.id}">${indicatorType} ${conditionType}</option>`;
+            }).join('');
+            
+            document.querySelectorAll('.left-alert, .right-alert').forEach(select => {
+                const currentValue = select.value;
+                select.innerHTML = '<option value="">Select Alert</option>' + alertOptions;
+                if (currentValue) {
+                    select.value = currentValue;
+                }
+            });
+        }
+        
+        document.getElementById('strategyForm').addEventListener('submit', function(e) {
+            // Collect alerts
+            const alertsData = [];
+            document.querySelectorAll('#alertsContainer .card').forEach(card => {
+                const alertId = card.id;
+                const indicatorType = card.querySelector('.indicator-type')?.value;
+                const conditionType = card.querySelector('.condition-type')?.value;
+                const targetField = card.querySelector('.target-field')?.value;
+                const threshold = card.querySelector('.threshold')?.value;
+                const action = card.querySelector('.action')?.value;
+                
+                if (indicatorType && conditionType && action) {
+                    alertsData.push({
+                        id: alertId,
+                        indicatorType: indicatorType,
+                        conditionType: conditionType,
+                        targetField: targetField || null,
+                        threshold: threshold ? parseFloat(threshold) : null,
+                        action: action,
+                        order: alertsData.length
+                    });
+                }
+            });
+            
+            // Collect conditions
+            const conditionsData = [];
+            document.querySelectorAll('#conditionsContainer .card').forEach(card => {
+                const conditionId = card.id;
+                const leftAlert = card.querySelector('.left-alert')?.value;
+                const operator = card.querySelector('.operator')?.value;
+                const rightAlert = card.querySelector('.right-alert')?.value;
+                const action = card.querySelector('.action')?.value;
+                
+                if (leftAlert && operator && rightAlert && action) {
+                    conditionsData.push({
+                        id: conditionId,
+                        leftAlertId: leftAlert,
+                        operator: operator,
+                        rightAlertId: rightAlert,
+                        action: action,
+                        order: conditionsData.length
+                    });
+                }
+            });
+            
+            document.getElementById('alertsJson').value = JSON.stringify(alertsData);
+            document.getElementById('conditionsJson').value = JSON.stringify(conditionsData);
+        });
+        
+        // Initialize on page load
+        updateConditionAlertOptions();
+    </script>
+}

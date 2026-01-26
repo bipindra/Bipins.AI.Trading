@@ -1,0 +1,44 @@
+@model Bipins.AI.Trading.Application.Options.TradingOptions
+@{
+    ViewData["Title"] = "Trading Control";
+}
+
+<h2>Trading Control</h2>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Trading Status</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    <strong>Enabled:</strong> 
+                    <span class="badge bg-@(Model.Enabled ? "success" : "danger")">
+                        @(Model.Enabled ? "Yes" : "No")
+                    </span>
+                </p>
+                <p>
+                    <strong>Mode:</strong> 
+                    <span class="badge bg-info">@Model.Mode</span>
+                </p>
+                <p><strong>Symbols:</strong> @string.Join(", ", Model.Symbols)</p>
+                <p><strong>Timeframe:</strong> @Model.Timeframe</p>
+                <p><strong>Max Orders Per Candle:</strong> @Model.MaxOrdersPerCandle</p>
+                <p><strong>Cooldown:</strong> @Model.CooldownSeconds seconds</p>
+                
+                <div class="mt-3">
+                    <form asp-action="ToggleEnabled" method="post">
+                        <button type="submit" class="btn btn-@(Model.Enabled ? "danger" : "success")">
+                            @(Model.Enabled ? "Disable Trading" : "Enable Trading")
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-warning mt-4">
+    <strong>Note:</strong> Configuration changes require application restart. Update appsettings.json and restart the application.
+</div>

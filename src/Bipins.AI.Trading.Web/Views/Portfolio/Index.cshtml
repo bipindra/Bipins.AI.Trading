@@ -1,0 +1,81 @@
+@model Bipins.AI.Trading.Domain.Entities.Portfolio
+@{
+    ViewData["Title"] = "Portfolio";
+}
+
+<h2>Portfolio</h2>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Account Summary</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>Cash:</strong> @Model.Cash.Amount.ToString("C")
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Equity:</strong> @Model.Equity.Amount.ToString("C")
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Buying Power:</strong> @Model.BuyingPower.Amount.ToString("C")
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Unrealized P&L:</strong> 
+                        <span class="@(Model.UnrealizedPnL.Amount >= 0 ? "text-success" : "text-danger")">
+                            @Model.UnrealizedPnL.Amount.ToString("C")
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Positions</h5>
+            </div>
+            <div class="card-body">
+                @if (Model.Positions.Any(p => !p.IsFlat))
+                {
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Quantity</th>
+                                <th>Avg Price</th>
+                                <th>Current Price</th>
+                                <th>Market Value</th>
+                                <th>Unrealized P&L</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var position in Model.Positions.Where(p => !p.IsFlat))
+                            {
+                                <tr>
+                                    <td>@position.Symbol.Value</td>
+                                    <td>@position.Quantity.Value</td>
+                                    <td>@position.AveragePrice.Amount.ToString("C")</td>
+                                    <td>@position.CurrentPrice.Amount.ToString("C")</td>
+                                    <td>@position.MarketValue.Amount.ToString("C")</td>
+                                    <td class="@(position.UnrealizedPnL.Amount >= 0 ? "text-success" : "text-danger")">
+                                        @position.UnrealizedPnL.Amount.ToString("C")
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="text-muted">No open positions</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>

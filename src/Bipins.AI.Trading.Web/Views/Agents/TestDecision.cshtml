@@ -1,0 +1,125 @@
+@model Bipins.AI.Trading.Web.Controllers.AgentTestDecisionViewModel
+@{
+    ViewData["Title"] = "Test Agent Decision";
+}
+
+<h1>@ViewData["Title"]</h1>
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">
+        @TempData["Error"]
+    </div>
+}
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Test Parameters</h5>
+            </div>
+            <div class="card-body">
+                <form method="get" asp-action="TestDecision">
+                    <div class="mb-3">
+                        <label for="symbol" class="form-label">Symbol</label>
+                        <input type="text" class="form-control" id="symbol" name="symbol" value="@Model.Symbol" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="timeframe" class="form-label">Timeframe</label>
+                        <select class="form-select" id="timeframe" name="timeframe">
+                            <option value="1m" selected="@(Model.Timeframe == "1m")">1m</option>
+                            <option value="5m" selected="@(Model.Timeframe == "5m")">5m</option>
+                            <option value="15m" selected="@(Model.Timeframe == "15m")">15m</option>
+                            <option value="1h" selected="@(Model.Timeframe == "1h")">1h</option>
+                            <option value="1d" selected="@(Model.Timeframe == "1d")">1d</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Test Decision</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    @if (Model.Decision != null)
+    {
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Agent Decision</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-sm-4">Action</dt>
+                        <dd class="col-sm-8">
+                            <span class="badge bg-@(Model.Decision.Action.ToString() == "Buy" ? "success" : Model.Decision.Action.ToString() == "Sell" ? "danger" : "secondary")">
+                                @Model.Decision.Action
+                            </span>
+                        </dd>
+                        
+                        <dt class="col-sm-4">Confidence</dt>
+                        <dd class="col-sm-8">@Model.Decision.Confidence.ToString("P2")</dd>
+                        
+                        <dt class="col-sm-4">Quantity %</dt>
+                        <dd class="col-sm-8">@(Model.Decision.QuantityPercent?.ToString("F2") ?? "N/A")%</dd>
+                        
+                        <dt class="col-sm-4">Rationale</dt>
+                        <dd class="col-sm-8">@Model.Decision.Rationale</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@if (Model.Context != null)
+{
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Agent Context</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <h6>Market Data</h6>
+                            <ul>
+                                <li>Candles: @Model.Context.Candles.Count</li>
+                                <li>Latest Close: @(Model.Context.Candles.LastOrDefault()?.Close.ToString("C") ?? "N/A")</li>
+                                <li>Volume: @(Model.Context.Candles.LastOrDefault()?.Volume.ToString("N0") ?? "N/A")</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-4">
+                            <h6>Indicators</h6>
+                            <ul>
+                                @foreach (var indicator in Model.Context.Indicators)
+                                {
+                                    <li>@indicator.Key: @System.Text.Json.JsonSerializer.Serialize(indicator.Value)</li>
+                                }
+                            </ul>
+                        </div>
+                        <div class="col-md-4">
+                            <h6>Similar Scenarios</h6>
+                            <ul>
+                                <li>Found: @Model.Context.SimilarScenarios.Count</li>
+                                @if (Model.Context.SimilarScenarios.Any())
+                                {
+                                    @foreach (var scenario in Model.Context.SimilarScenarios.Take(3))
+                                    {
+                                        <li>@scenario.Decision (similarity: @scenario.SimilarityScore.ToString("F3"))</li>
+                                    }
+                                }
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="row mt-4">
+    <div class="col-12">
+        <a asp-action="Index" class="btn btn-secondary">Back to Agent</a>
+    </div>
+</div>

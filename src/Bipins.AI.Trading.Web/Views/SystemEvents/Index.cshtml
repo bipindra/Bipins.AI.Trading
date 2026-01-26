@@ -1,0 +1,37 @@
+@model List<Bipins.AI.Trading.Infrastructure.Persistence.Entities.AgentEventEntity>
+@{
+    ViewData["Title"] = "System Events";
+}
+
+<h2>System Events</h2>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Event Type</th>
+                    <th>Message</th>
+                    <th>Symbol</th>
+                    <th>Timestamp</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var evt in Model)
+                {
+                    <tr>
+                        <td>
+                            <span class="badge bg-@(evt.EventType == "RiskBreach" ? "danger" : 
+                                evt.EventType == "Error" ? "danger" : "warning")">
+                                @evt.EventType
+                            </span>
+                        </td>
+                        <td>@evt.Message</td>
+                        <td>@(evt.Symbol ?? "-")</td>
+                        <td>@evt.EventTimestamp</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

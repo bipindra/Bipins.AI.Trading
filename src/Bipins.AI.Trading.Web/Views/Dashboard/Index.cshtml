@@ -1,0 +1,83 @@
+@model Bipins.AI.Trading.Domain.Entities.Portfolio
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <h2>Dashboard</h2>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Cash</h5>
+                <h3 class="text-primary">@Model.Cash.Amount.ToString("C")</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Equity</h5>
+                <h3 class="text-success">@Model.Equity.Amount.ToString("C")</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Total P&L</h5>
+                <h3 class="@(Model.TotalPnL.Amount >= 0 ? "text-success" : "text-danger")">
+                    @Model.TotalPnL.Amount.ToString("C")
+                </h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Buying Power</h5>
+                <h3 class="text-info">@Model.BuyingPower.Amount.ToString("C")</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Trading Status</h5>
+                <p>
+                    <strong>Enabled:</strong> 
+                    <span class="badge bg-@(ViewBag.TradingEnabled ? "success" : "danger")">
+                        @(ViewBag.TradingEnabled ? "Yes" : "No")
+                    </span>
+                </p>
+                <p>
+                    <strong>Mode:</strong> 
+                    <span class="badge bg-info">@ViewBag.TradingMode</span>
+                </p>
+                <p>
+                    <strong>Last Updated:</strong> @ViewBag.LastUpdated
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Positions</h5>
+                <p><strong>Open Positions:</strong> @Model.Positions.Count(p => !p.IsFlat)</p>
+                <p><strong>Unrealized P&L:</strong> 
+                    <span class="@(Model.UnrealizedPnL.Amount >= 0 ? "text-success" : "text-danger")">
+                        @Model.UnrealizedPnL.Amount.ToString("C")
+                    </span>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>

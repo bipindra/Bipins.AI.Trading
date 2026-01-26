@@ -1,0 +1,336 @@
+@model Bipins.AI.Trading.Web.Controllers.SettingsViewModel
+@{
+    ViewData["Title"] = "Settings";
+}
+
+<div class="container mt-4">
+    <h2>Settings</h2>
+    <hr />
+    
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @TempData["SuccessMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @TempData["ErrorMessage"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+    
+    <!-- LLM Provider Selection (Top Level) -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>LLM Provider Selection</h5>
+        </div>
+        <div class="card-body">
+            <form asp-action="UpdateLLMProvider" method="post" id="providerForm">
+                @Html.AntiForgeryToken()
+                <div class="row align-items-end">
+                    <div class="col-md-6">
+                        <label for="LLM_Provider" class="form-label">Active LLM Provider</label>
+                        <select name="Provider" id="LLM_Provider" class="form-select" onchange="updateActiveTab()">
+                            <option value="OpenAI" selected="@(Model.LLM.Provider == "OpenAI")">OpenAI</option>
+                            <option value="Anthropic" selected="@(Model.LLM.Provider == "Anthropic")">Anthropic</option>
+                            <option value="AzureOpenAI" selected="@(Model.LLM.Provider == "AzureOpenAI")">Azure OpenAI</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <button type="submit" class="btn btn-primary">Save Provider Selection</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Tabs Navigation -->
+    <ul class="nav nav-tabs mb-4" id="settingsTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="alpaca-tab" data-bs-toggle="tab" data-bs-target="#alpaca" type="button" role="tab">
+                Alpaca API
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="openai-tab" data-bs-toggle="tab" data-bs-target="#openai" type="button" role="tab">
+                OpenAI
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="anthropic-tab" data-bs-toggle="tab" data-bs-target="#anthropic" type="button" role="tab">
+                Anthropic
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="azure-tab" data-bs-toggle="tab" data-bs-target="#azure" type="button" role="tab">
+                Azure OpenAI
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="qdrant-tab" data-bs-toggle="tab" data-bs-target="#qdrant" type="button" role="tab">
+                Qdrant
+            </button>
+        </li>
+    </ul>
+    
+    <!-- Tabs Content -->
+    <div class="tab-content" id="settingsTabsContent">
+        <!-- Alpaca Tab -->
+        <div class="tab-pane fade show active" id="alpaca" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Alpaca API Configuration</h5>
+                </div>
+                <div class="card-body">
+                    @if (!Model.Alpaca.HasApiKey)
+                    {
+                        <div class="alert alert-warning">
+                            <strong>API credentials not configured.</strong> Please enter your Alpaca API key and secret to enable broker operations.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info">
+                            <strong>API credentials are configured.</strong> You can update them below.
+                        </div>
+                    }
+                    
+                    <form asp-action="UpdateAlpacaCredentials" method="post">
+                        @Html.AntiForgeryToken()
+                        
+                        <div class="mb-3">
+                            <label asp-for="Alpaca.ApiKey" class="form-label">API Key</label>
+                            <input asp-for="Alpaca.ApiKey" class="form-control" type="text" placeholder="Enter your Alpaca API Key" />
+                            <span asp-validation-for="Alpaca.ApiKey" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="Alpaca.ApiSecret" class="form-label">API Secret</label>
+                            <input asp-for="Alpaca.ApiSecret" class="form-control" type="password" placeholder="Enter your Alpaca API Secret" />
+                            <span asp-validation-for="Alpaca.ApiSecret" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Base URL</label>
+                            <input type="text" class="form-control" value="@Model.Alpaca.BaseUrl" readonly />
+                            <small class="form-text text-muted">Alpaca Paper Trading API endpoint</small>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Save Alpaca Settings</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- OpenAI Tab -->
+        <div class="tab-pane fade" id="openai" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5>OpenAI Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="UpdateLLMSettings" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="LLM.Provider" value="OpenAI" />
+                        
+                        <h6 class="mt-2">OpenAI Settings</h6>
+                        <div class="mb-3">
+                            <label asp-for="LLM.OpenAI.ApiKey" class="form-label">API Key</label>
+                            <input asp-for="LLM.OpenAI.ApiKey" class="form-control" type="password" placeholder="sk-..." />
+                            <span asp-validation-for="LLM.OpenAI.ApiKey" class="text-danger"></span>
+                            <small class="form-text text-muted">Your OpenAI API key (stored securely)</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="LLM.OpenAI.Model" class="form-label">Model</label>
+                            <input asp-for="LLM.OpenAI.Model" class="form-control" placeholder="gpt-4" />
+                            <span asp-validation-for="LLM.OpenAI.Model" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="LLM.OpenAI.Temperature" class="form-label">Temperature</label>
+                                <input asp-for="LLM.OpenAI.Temperature" class="form-control" type="number" step="0.1" min="0" max="2" />
+                                <span asp-validation-for="LLM.OpenAI.Temperature" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="LLM.OpenAI.MaxTokens" class="form-label">Max Tokens</label>
+                                <input asp-for="LLM.OpenAI.MaxTokens" class="form-control" type="number" />
+                                <span asp-validation-for="LLM.OpenAI.MaxTokens" class="text-danger"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="LLM.OpenAI.EmbeddingModel" class="form-label">Embedding Model</label>
+                            <input asp-for="LLM.OpenAI.EmbeddingModel" class="form-control" placeholder="text-embedding-3-small" />
+                            <span asp-validation-for="LLM.OpenAI.EmbeddingModel" class="text-danger"></span>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Save OpenAI Settings</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Anthropic Tab -->
+        <div class="tab-pane fade" id="anthropic" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Anthropic Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="UpdateLLMSettings" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="LLM.Provider" value="Anthropic" />
+                        
+                        <h6 class="mt-2">Anthropic Settings</h6>
+                        <div class="mb-3">
+                            <label asp-for="LLM.Anthropic.ApiKey" class="form-label">API Key</label>
+                            <input asp-for="LLM.Anthropic.ApiKey" class="form-control" type="password" placeholder="sk-ant-..." />
+                            <span asp-validation-for="LLM.Anthropic.ApiKey" class="text-danger"></span>
+                            <small class="form-text text-muted">Your Anthropic API key (stored securely)</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="LLM.Anthropic.Model" class="form-label">Model</label>
+                            <input asp-for="LLM.Anthropic.Model" class="form-control" placeholder="claude-3-opus-20240229" />
+                            <span asp-validation-for="LLM.Anthropic.Model" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="LLM.Anthropic.Temperature" class="form-label">Temperature</label>
+                                <input asp-for="LLM.Anthropic.Temperature" class="form-control" type="number" step="0.1" min="0" max="1" />
+                                <span asp-validation-for="LLM.Anthropic.Temperature" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="LLM.Anthropic.MaxTokens" class="form-label">Max Tokens</label>
+                                <input asp-for="LLM.Anthropic.MaxTokens" class="form-control" type="number" />
+                                <span asp-validation-for="LLM.Anthropic.MaxTokens" class="text-danger"></span>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Save Anthropic Settings</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Azure OpenAI Tab -->
+        <div class="tab-pane fade" id="azure" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Azure OpenAI Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="UpdateLLMSettings" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="LLM.Provider" value="AzureOpenAI" />
+                        
+                        <h6 class="mt-2">Azure OpenAI Settings</h6>
+                        <div class="mb-3">
+                            <label asp-for="LLM.AzureOpenAI.Endpoint" class="form-label">Endpoint</label>
+                            <input asp-for="LLM.AzureOpenAI.Endpoint" class="form-control" placeholder="https://your-resource.openai.azure.com" />
+                            <span asp-validation-for="LLM.AzureOpenAI.Endpoint" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="LLM.AzureOpenAI.ApiKey" class="form-label">API Key</label>
+                            <input asp-for="LLM.AzureOpenAI.ApiKey" class="form-control" type="password" placeholder="Enter your Azure OpenAI API key" />
+                            <span asp-validation-for="LLM.AzureOpenAI.ApiKey" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="LLM.AzureOpenAI.DeploymentName" class="form-label">Deployment Name</label>
+                            <input asp-for="LLM.AzureOpenAI.DeploymentName" class="form-control" placeholder="gpt-4" />
+                            <span asp-validation-for="LLM.AzureOpenAI.DeploymentName" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="LLM.AzureOpenAI.Temperature" class="form-label">Temperature</label>
+                                <input asp-for="LLM.AzureOpenAI.Temperature" class="form-control" type="number" step="0.1" min="0" max="2" />
+                                <span asp-validation-for="LLM.AzureOpenAI.Temperature" class="text-danger"></span>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="LLM.AzureOpenAI.MaxTokens" class="form-label">Max Tokens</label>
+                                <input asp-for="LLM.AzureOpenAI.MaxTokens" class="form-control" type="number" />
+                                <span asp-validation-for="LLM.AzureOpenAI.MaxTokens" class="text-danger"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="LLM.AzureOpenAI.EmbeddingDeploymentName" class="form-label">Embedding Deployment Name</label>
+                            <input asp-for="LLM.AzureOpenAI.EmbeddingDeploymentName" class="form-control" placeholder="text-embedding-3-small" />
+                            <span asp-validation-for="LLM.AzureOpenAI.EmbeddingDeploymentName" class="text-danger"></span>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Save Azure OpenAI Settings</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Qdrant Tab -->
+        <div class="tab-pane fade" id="qdrant" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Qdrant Vector Database Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="UpdateVectorDbSettings" method="post">
+                        @Html.AntiForgeryToken()
+                        
+                        <div class="mb-3">
+                            <label asp-for="VectorDb.Qdrant.Endpoint" class="form-label">Endpoint</label>
+                            <input asp-for="VectorDb.Qdrant.Endpoint" class="form-control" placeholder="http://localhost:6333" />
+                            <span asp-validation-for="VectorDb.Qdrant.Endpoint" class="text-danger"></span>
+                            <small class="form-text text-muted">Qdrant server endpoint URL</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="VectorDb.Qdrant.CollectionName" class="form-label">Collection Name</label>
+                            <input asp-for="VectorDb.Qdrant.CollectionName" class="form-control" placeholder="trading_decisions" />
+                            <span asp-validation-for="VectorDb.Qdrant.CollectionName" class="text-danger"></span>
+                            <small class="form-text text-muted">Default collection name for storing trading scenarios</small>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <strong>Note:</strong> Make sure Qdrant is running before using vector search features. 
+                            You can start it using Docker: <code>docker-compose up -d qdrant</code>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Save Qdrant Settings</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        // Auto-select the appropriate tab based on provider
+        document.addEventListener('DOMContentLoaded', function() {
+            const provider = '@Model.LLM.Provider';
+            updateActiveTab();
+        });
+        
+        function updateActiveTab() {
+            const provider = document.getElementById('LLM_Provider').value;
+            // Switch to the appropriate tab
+            if (provider === 'OpenAI') {
+                document.getElementById('openai-tab').click();
+            } else if (provider === 'Anthropic') {
+                document.getElementById('anthropic-tab').click();
+            } else if (provider === 'AzureOpenAI') {
+                document.getElementById('azure-tab').click();
+            }
+        }
+    </script>
+}
