@@ -200,14 +200,29 @@ class ChartManager {
             console.log('Fetching chart data from:', url);
             
             const response = await fetch(url);
+            
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Failed to load chart data:', response.status, errorText);
-                throw new Error(`Failed to load chart data: ${response.status} ${errorText}`);
+                let errorMessage = `HTTP ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorData.message || errorMessage;
+                    if (errorData.details) {
+                        errorMessage += `: ${errorData.details}`;
+                    }
+                } catch (e) {
+                    const errorText = await response.text();
+                    errorMessage = errorText || errorMessage;
+                }
+                console.error('Failed to load chart data:', response.status, errorMessage);
+                throw new Error(`Failed to load chart data: ${errorMessage}`);
             }
 
             const data = await response.json();
             console.log('Chart data received:', data.candles?.length || 0, 'candles');
+            
+            if (!data) {
+                throw new Error('Invalid response from server');
+            }
 
             if (!data.candles || data.candles.length === 0) {
                 console.warn('No candle data available');

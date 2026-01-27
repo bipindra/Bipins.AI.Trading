@@ -161,3 +161,7 @@ appsettings.Local.json
 trading.db
 trading.db-shm
 trading.db-wal
+
+# Cursor IDE files
+.cursor/
+.cursor/**

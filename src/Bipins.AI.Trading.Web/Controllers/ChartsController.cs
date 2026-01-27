@@ -51,40 +51,71 @@ public class ChartsController : Controller
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(symbol))
+            {
+                _logger.LogWarning("Symbol parameter is missing or empty");
+                return BadRequest(new { error = "Symbol parameter is required" });
+            }
+
             // Default time range: last 7 days
             var toDate = to ?? DateTime.UtcNow;
             var fromDate = from ?? toDate.AddDays(-7);
+
+            _logger.LogInformation("Requesting candles for {Symbol} {Timeframe} from {From} to {To}", 
+                symbol, timeframe, fromDate, toDate);
 
             var symbolObj = new Symbol(symbol);
             var timeframeObj = new Timeframe(timeframe);
 
             // Try to get from repository first (cached/stored data)
-            var storedCandles = await _candleRepository.GetCandlesAsync(
-                symbolObj,
-                timeframeObj,
-                fromDate,
-                toDate,
-                cancellationToken);
-
-            List<Domain.Entities.Candle> candles;
-
-            if (storedCandles.Any())
+            List<Domain.Entities.Candle> storedCandles;
+            try
             {
-                candles = storedCandles;
-                _logger.LogDebug("Retrieved {Count} candles from repository for {Symbol} {Timeframe}",
-                    candles.Count, symbol, timeframe);
-            }
-            else
-            {
-                // Fall back to market data client
-                candles = await _marketDataClient.GetHistoricalCandlesAsync(
+                storedCandles = await _candleRepository.GetCandlesAsync(
                     symbolObj,
                     timeframeObj,
                     fromDate,
                     toDate,
                     cancellationToken);
-                _logger.LogDebug("Retrieved {Count} candles from market data for {Symbol} {Timeframe}",
+                _logger.LogDebug("Repository returned {Count} candles for {Symbol} {Timeframe}",
+                    storedCandles?.Count ?? 0, symbol, timeframe);
+            }
+            catch (Exception repoEx)
+            {
+                _logger.LogWarning(repoEx, "Error retrieving candles from repository, falling back to market data");
+                storedCandles = new List<Domain.Entities.Candle>();
+            }
+
+            List<Domain.Entities.Candle> candles;
+
+            if (storedCandles != null && storedCandles.Any())
+            {
+                candles = storedCandles;
+                _logger.LogInformation("Using {Count} candles from repository for {Symbol} {Timeframe}",
                     candles.Count, symbol, timeframe);
+            }
+            else
+            {
+                // Fall back to market data client
+                _logger.LogInformation("No candles in repository, fetching from market data client for {Symbol} {Timeframe}",
+                    symbol, timeframe);
+                
+                try
+                {
+                    candles = await _marketDataClient.GetHistoricalCandlesAsync(
+                        symbolObj,
+                        timeframeObj,
+                        fromDate,
+                        toDate,
+                        cancellationToken);
+                    _logger.LogInformation("Retrieved {Count} candles from market data for {Symbol} {Timeframe}",
+                        candles?.Count ?? 0, symbol, timeframe);
+                }
+                catch (Exception marketEx)
+                {
+                    _logger.LogError(marketEx, "Error retrieving candles from market data client");
+                    candles = new List<Domain.Entities.Candle>();
+                }
             }
 
             var candleDtos = candles.Select(c => new CandleDataDto
@@ -106,8 +137,12 @@ public class ChartsController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to get candles for {Symbol} {Timeframe}", symbol, timeframe);
-            return StatusCode(500, new { error = "Failed to retrieve chart data" });
+            _logger.LogError(ex, "Failed to get candles for {Symbol} {Timeframe}. Error: {Error}", symbol, timeframe, ex.Message);
+            return StatusCode(500, new { 
+                error = "Failed to retrieve chart data",
+                message = ex.Message,
+                details = ex.InnerException?.Message
+            });
         }
     }
 
