@@ -267,14 +267,31 @@ public class SettingsController : Controller
     
     [HttpPost]
     [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateVectorDbProvider(string provider, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var currentOptions = await _configurationService.GetVectorDbOptionsAsync(cancellationToken);
+            currentOptions.Provider = provider;
+            await _configurationService.SetVectorDbOptionsAsync(currentOptions, cancellationToken);
+            
+            TempData["SuccessMessage"] = $"Vector DB provider set to {provider}. Restart the application for changes to take effect.";
+            _logger.LogInformation("Vector DB provider updated to {Provider} via UI", provider);
+            
+            return RedirectToAction(nameof(Index));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update Vector DB provider");
+            TempData["ErrorMessage"] = "An error occurred while saving the provider selection. Please try again.";
+            return RedirectToAction(nameof(Index));
+        }
+    }
+    
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateVectorDbSettings([Bind(Prefix = "VectorDb")] VectorDbOptions model, CancellationToken cancellationToken)
     {
-        // Ensure Qdrant is initialized if null (model binding might not create nested objects)
-        if (model.Qdrant == null)
-        {
-            model.Qdrant = new Application.Options.QdrantOptions();
-        }
-        
         // Get current options to preserve provider if not set
         var currentOptions = await _configurationService.GetVectorDbOptionsAsync(cancellationToken);
         if (string.IsNullOrEmpty(model.Provider))
@@ -282,17 +299,48 @@ public class SettingsController : Controller
             model.Provider = currentOptions.Provider;
         }
         
-        // If Qdrant properties are empty, try to get them from form directly
-        var endpoint = Request.Form["VectorDb.Qdrant.Endpoint"].ToString();
-        var collectionName = Request.Form["VectorDb.Qdrant.CollectionName"].ToString();
+        // Ensure nested objects are initialized
+        if (model.Qdrant == null) model.Qdrant = new Application.Options.QdrantOptions();
+        if (model.Pinecone == null) model.Pinecone = new Application.Options.PineconeOptions();
+        if (model.Milvus == null) model.Milvus = new Application.Options.MilvusOptions();
+        if (model.Weaviate == null) model.Weaviate = new Application.Options.WeaviateOptions();
         
-        if (!string.IsNullOrEmpty(endpoint))
+        // Read provider-specific settings from form based on provider
+        switch (model.Provider)
         {
-            model.Qdrant.Endpoint = endpoint;
-        }
-        if (!string.IsNullOrEmpty(collectionName))
-        {
-            model.Qdrant.CollectionName = collectionName;
+            case "Qdrant":
+                var endpoint = Request.Form["VectorDb.Qdrant.Endpoint"].ToString();
+                var collectionName = Request.Form["VectorDb.Qdrant.CollectionName"].ToString();
+                if (!string.IsNullOrEmpty(endpoint)) model.Qdrant.Endpoint = endpoint;
+                if (!string.IsNullOrEmpty(collectionName)) model.Qdrant.CollectionName = collectionName;
+                break;
+                
+            case "Pinecone":
+                var apiKey = Request.Form["VectorDb.Pinecone.ApiKey"].ToString();
+                var environment = Request.Form["VectorDb.Pinecone.Environment"].ToString();
+                var indexName = Request.Form["VectorDb.Pinecone.IndexName"].ToString();
+                if (!string.IsNullOrEmpty(apiKey)) model.Pinecone.ApiKey = apiKey;
+                if (!string.IsNullOrEmpty(environment)) model.Pinecone.Environment = environment;
+                if (!string.IsNullOrEmpty(indexName)) model.Pinecone.IndexName = indexName;
+                break;
+                
+            case "Milvus":
+                var host = Request.Form["VectorDb.Milvus.Host"].ToString();
+                var port = Request.Form["VectorDb.Milvus.Port"].ToString();
+                var milvusCollection = Request.Form["VectorDb.Milvus.CollectionName"].ToString();
+                if (!string.IsNullOrEmpty(host)) model.Milvus.Host = host;
+                if (!string.IsNullOrEmpty(port) && int.TryParse(port, out var p)) model.Milvus.Port = p;
+                if (!string.IsNullOrEmpty(milvusCollection)) model.Milvus.CollectionName = milvusCollection;
+                break;
+                
+            case "Weaviate":
+                var weaviateEndpoint = Request.Form["VectorDb.Weaviate.Endpoint"].ToString();
+                var weaviateApiKey = Request.Form["VectorDb.Weaviate.ApiKey"].ToString();
+                var className = Request.Form["VectorDb.Weaviate.ClassName"].ToString();
+                if (!string.IsNullOrEmpty(weaviateEndpoint)) model.Weaviate.Endpoint = weaviateEndpoint;
+                if (!string.IsNullOrEmpty(weaviateApiKey)) model.Weaviate.ApiKey = weaviateApiKey;
+                if (!string.IsNullOrEmpty(className)) model.Weaviate.ClassName = className;
+                break;
         }
         
         if (!ModelState.IsValid)
@@ -315,12 +363,11 @@ public class SettingsController : Controller
         
         try
         {
-            _logger.LogInformation("Saving Vector DB settings: Endpoint={Endpoint}, CollectionName={CollectionName}", 
-                model.Qdrant.Endpoint, model.Qdrant.CollectionName);
+            _logger.LogInformation("Saving Vector DB settings for provider: {Provider}", model.Provider);
             
             await _configurationService.SetVectorDbOptionsAsync(model, cancellationToken);
-            TempData["SuccessMessage"] = "Vector DB settings have been saved successfully. Restart the application for changes to take effect.";
-            _logger.LogInformation("Vector DB settings updated via UI: Endpoint={Endpoint}", model.Qdrant.Endpoint);
+            TempData["SuccessMessage"] = $"{model.Provider} Vector DB settings have been saved successfully. Restart the application for changes to take effect.";
+            _logger.LogInformation("Vector DB settings updated via UI for provider: {Provider}", model.Provider);
             
             return RedirectToAction(nameof(Index));
         }

@@ -135,8 +135,26 @@ public class ConfigurationService : IConfigurationService
         var options = new VectorDbOptions();
         
         options.Provider = await GetValueAsync("VectorDb:Provider", cancellationToken) ?? "Qdrant";
+        
+        // Qdrant options
         options.Qdrant.Endpoint = await GetValueAsync("VectorDb:Qdrant:Endpoint", cancellationToken) ?? "http://localhost:6333";
         options.Qdrant.CollectionName = await GetValueAsync("VectorDb:Qdrant:CollectionName", cancellationToken) ?? "trading_decisions";
+        
+        // Pinecone options
+        options.Pinecone.ApiKey = await GetValueAsync("VectorDb:Pinecone:ApiKey", cancellationToken) ?? string.Empty;
+        options.Pinecone.Environment = await GetValueAsync("VectorDb:Pinecone:Environment", cancellationToken) ?? string.Empty;
+        options.Pinecone.IndexName = await GetValueAsync("VectorDb:Pinecone:IndexName", cancellationToken) ?? "trading-decisions";
+        
+        // Milvus options
+        options.Milvus.Host = await GetValueAsync("VectorDb:Milvus:Host", cancellationToken) ?? "localhost";
+        var milvusPort = await GetValueAsync("VectorDb:Milvus:Port", cancellationToken);
+        options.Milvus.Port = int.TryParse(milvusPort, out var port) ? port : 19530;
+        options.Milvus.CollectionName = await GetValueAsync("VectorDb:Milvus:CollectionName", cancellationToken) ?? "trading_decisions";
+        
+        // Weaviate options
+        options.Weaviate.Endpoint = await GetValueAsync("VectorDb:Weaviate:Endpoint", cancellationToken) ?? "http://localhost:8080";
+        options.Weaviate.ApiKey = await GetValueAsync("VectorDb:Weaviate:ApiKey", cancellationToken) ?? string.Empty;
+        options.Weaviate.ClassName = await GetValueAsync("VectorDb:Weaviate:ClassName", cancellationToken) ?? "TradingDecision";
         
         return options;
     }
@@ -144,9 +162,26 @@ public class ConfigurationService : IConfigurationService
     public async Task SetVectorDbOptionsAsync(VectorDbOptions options, CancellationToken cancellationToken = default)
     {
         await SetValueAsync("VectorDb:Provider", options.Provider, cancellationToken);
+        
+        // Qdrant options
         await SetValueAsync("VectorDb:Qdrant:Endpoint", options.Qdrant.Endpoint, cancellationToken);
         await SetValueAsync("VectorDb:Qdrant:CollectionName", options.Qdrant.CollectionName, cancellationToken);
         
-        _logger.LogInformation("Vector DB options updated");
+        // Pinecone options
+        await SetValueAsync("VectorDb:Pinecone:ApiKey", options.Pinecone.ApiKey, cancellationToken);
+        await SetValueAsync("VectorDb:Pinecone:Environment", options.Pinecone.Environment, cancellationToken);
+        await SetValueAsync("VectorDb:Pinecone:IndexName", options.Pinecone.IndexName, cancellationToken);
+        
+        // Milvus options
+        await SetValueAsync("VectorDb:Milvus:Host", options.Milvus.Host, cancellationToken);
+        await SetValueAsync("VectorDb:Milvus:Port", options.Milvus.Port.ToString(), cancellationToken);
+        await SetValueAsync("VectorDb:Milvus:CollectionName", options.Milvus.CollectionName, cancellationToken);
+        
+        // Weaviate options
+        await SetValueAsync("VectorDb:Weaviate:Endpoint", options.Weaviate.Endpoint, cancellationToken);
+        await SetValueAsync("VectorDb:Weaviate:ApiKey", options.Weaviate.ApiKey, cancellationToken);
+        await SetValueAsync("VectorDb:Weaviate:ClassName", options.Weaviate.ClassName, cancellationToken);
+        
+        _logger.LogInformation("Vector DB options updated for provider: {Provider}", options.Provider);
     }
 }
