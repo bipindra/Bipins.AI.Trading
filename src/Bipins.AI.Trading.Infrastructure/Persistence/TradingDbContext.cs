@@ -102,6 +102,7 @@ public class TradingDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
             entity.Property(e => e.Description).HasMaxLength(1000);
             entity.Property(e => e.Timeframe).IsRequired().HasMaxLength(10);
+            entity.Property(e => e.FinalAction).HasMaxLength(10);
         });
         
         // IndicatorAlertEntity

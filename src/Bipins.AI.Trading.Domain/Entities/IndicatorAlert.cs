@@ -4,6 +4,7 @@ namespace Bipins.AI.Trading.Domain.Entities;
 
 public enum IndicatorType
 {
+    Price,
     MACD,
     RSI,
     Stochastic

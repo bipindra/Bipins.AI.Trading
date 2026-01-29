@@ -52,15 +52,19 @@ public class StrategiesController : Controller
     }
     
     [HttpPost]
-    public async Task<IActionResult> Create(Strategy strategy, string? alertsJson, string? conditionsJson, CancellationToken cancellationToken)
+    public async Task<IActionResult> Create(Strategy strategy, string? alertsJson, string? conditionsJson, string? finalAction, CancellationToken cancellationToken)
     {
-        if (ModelState.IsValid)
+        // Initialize collections if null
+        strategy.Alerts ??= new List<IndicatorAlert>();
+        strategy.Conditions ??= new List<AlertCondition>();
+        
+        // Parse alerts from JSON
+        if (!string.IsNullOrEmpty(alertsJson))
         {
-            // Parse alerts from JSON
-            if (!string.IsNullOrEmpty(alertsJson))
+            try
             {
                 var alertsData = System.Text.Json.JsonSerializer.Deserialize<List<AlertData>>(alertsJson);
-                if (alertsData != null)
+                if (alertsData != null && alertsData.Count > 0)
                 {
                     strategy.Alerts = alertsData.Select((a, index) => new IndicatorAlert
                     {
@@ -71,33 +75,91 @@ public class StrategiesController : Controller
                         Threshold = a.Threshold,
                         TargetField = a.TargetField,
                         Timeframe = strategy.Timeframe,
-                        Action = Enum.Parse<TradeAction>(a.Action),
+                        Action = TradeAction.Hold, // Alerts don't have actions anymore, use Hold as default
                         Order = index
                     }).ToList();
                 }
             }
-            
-            // Parse conditions from JSON
-            if (!string.IsNullOrEmpty(conditionsJson))
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error parsing alerts JSON: {AlertsJson}", alertsJson);
+                ModelState.AddModelError("", $"Error parsing alerts: {ex.Message}");
+            }
+        }
+        
+        // Parse conditions from JSON
+        if (!string.IsNullOrEmpty(conditionsJson))
+        {
+            try
             {
                 var conditionsData = System.Text.Json.JsonSerializer.Deserialize<List<ConditionData>>(conditionsJson);
-                if (conditionsData != null)
+                if (conditionsData != null && conditionsData.Count > 0)
                 {
-                    strategy.Conditions = conditionsData.Select((c, index) => new AlertCondition
-                    {
-                        Id = c.Id ?? Guid.NewGuid().ToString(),
-                        StrategyId = strategy.Id,
-                        LeftAlertId = c.LeftAlertId,
-                        Operator = Enum.Parse<ConditionOperator>(c.Operator),
-                        RightAlertId = c.RightAlertId,
-                        Action = Enum.Parse<TradeAction>(c.Action),
-                        Order = index
-                    }).ToList();
+                    strategy.Conditions = conditionsData
+                        .Where(c => !string.IsNullOrEmpty(c.LeftAlertId) && !string.IsNullOrEmpty(c.RightAlertId))
+                        .Select((c, index) => new AlertCondition
+                        {
+                            Id = c.Id ?? Guid.NewGuid().ToString(),
+                            StrategyId = strategy.Id,
+                            LeftAlertId = c.LeftAlertId,
+                            Operator = Enum.Parse<ConditionOperator>(c.Operator),
+                            RightAlertId = c.RightAlertId,
+                            Action = TradeAction.Hold, // Conditions don't have actions anymore, use Hold as default
+                            Order = index
+                        }).ToList();
                 }
             }
-            
-            await _strategyRepository.AddAsync(strategy, cancellationToken);
-            return RedirectToAction(nameof(Index));
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error parsing conditions JSON: {ConditionsJson}", conditionsJson);
+                ModelState.AddModelError("", $"Error parsing conditions: {ex.Message}");
+            }
+        }
+        
+        // Validate that we have at least one alert
+        if (strategy.Alerts.Count == 0)
+        {
+            ModelState.AddModelError("", "At least one alert criteria is required.");
+        }
+        
+        // Validate final action
+        if (string.IsNullOrEmpty(finalAction) || !Enum.TryParse<TradeAction>(finalAction, out var action))
+        {
+            ModelState.AddModelError("", "A strategy action (Buy or Sell) is required.");
+        }
+        else
+        {
+            strategy.FinalAction = action;
+        }
+        
+        // Validate Timeframe
+        if (strategy.Timeframe == null)
+        {
+            ModelState.AddModelError("Timeframe", "Timeframe is required.");
+        }
+        
+        if (ModelState.IsValid)
+        {
+            try
+            {
+                await _strategyRepository.AddAsync(strategy, cancellationToken);
+                TempData["Message"] = "Strategy created successfully.";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error saving strategy");
+                ModelState.AddModelError("", $"Error saving strategy: {ex.Message}");
+            }
+        }
+        
+        // Log ModelState errors for debugging
+        foreach (var error in ModelState)
+        {
+            foreach (var errorMessage in error.Value.Errors)
+            {
+                _logger.LogWarning("ModelState Error - {Key}: {Message}", error.Key, errorMessage.ErrorMessage);
+            }
         }
         
         return View(strategy);
@@ -134,15 +196,19 @@ public class StrategiesController : Controller
     }
     
     [HttpPost]
-    public async Task<IActionResult> Edit(Strategy strategy, string? alertsJson, string? conditionsJson, CancellationToken cancellationToken)
+    public async Task<IActionResult> Edit(Strategy strategy, string? alertsJson, string? conditionsJson, string? finalAction, CancellationToken cancellationToken)
     {
-        if (ModelState.IsValid)
+        // Initialize collections if null
+        strategy.Alerts ??= new List<IndicatorAlert>();
+        strategy.Conditions ??= new List<AlertCondition>();
+        
+        // Parse alerts from JSON
+        if (!string.IsNullOrEmpty(alertsJson))
         {
-            // Parse alerts from JSON
-            if (!string.IsNullOrEmpty(alertsJson))
+            try
             {
                 var alertsData = System.Text.Json.JsonSerializer.Deserialize<List<AlertData>>(alertsJson);
-                if (alertsData != null)
+                if (alertsData != null && alertsData.Count > 0)
                 {
                     strategy.Alerts = alertsData.Select((a, index) => new IndicatorAlert
                     {
@@ -153,34 +219,92 @@ public class StrategiesController : Controller
                         Threshold = a.Threshold,
                         TargetField = a.TargetField,
                         Timeframe = strategy.Timeframe,
-                        Action = Enum.Parse<TradeAction>(a.Action),
+                        Action = TradeAction.Hold, // Alerts don't have actions anymore, use Hold as default
                         Order = index
                     }).ToList();
                 }
             }
-            
-            // Parse conditions from JSON
-            if (!string.IsNullOrEmpty(conditionsJson))
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error parsing alerts JSON: {AlertsJson}", alertsJson);
+                ModelState.AddModelError("", $"Error parsing alerts: {ex.Message}");
+            }
+        }
+        
+        // Parse conditions from JSON
+        if (!string.IsNullOrEmpty(conditionsJson))
+        {
+            try
             {
                 var conditionsData = System.Text.Json.JsonSerializer.Deserialize<List<ConditionData>>(conditionsJson);
-                if (conditionsData != null)
+                if (conditionsData != null && conditionsData.Count > 0)
                 {
-                    strategy.Conditions = conditionsData.Select((c, index) => new AlertCondition
-                    {
-                        Id = c.Id ?? Guid.NewGuid().ToString(),
-                        StrategyId = strategy.Id,
-                        LeftAlertId = c.LeftAlertId,
-                        Operator = Enum.Parse<ConditionOperator>(c.Operator),
-                        RightAlertId = c.RightAlertId,
-                        Action = Enum.Parse<TradeAction>(c.Action),
-                        Order = index
-                    }).ToList();
+                    strategy.Conditions = conditionsData
+                        .Where(c => !string.IsNullOrEmpty(c.LeftAlertId) && !string.IsNullOrEmpty(c.RightAlertId))
+                        .Select((c, index) => new AlertCondition
+                        {
+                            Id = c.Id ?? Guid.NewGuid().ToString(),
+                            StrategyId = strategy.Id,
+                            LeftAlertId = c.LeftAlertId,
+                            Operator = Enum.Parse<ConditionOperator>(c.Operator),
+                            RightAlertId = c.RightAlertId,
+                            Action = TradeAction.Hold, // Conditions don't have actions anymore, use Hold as default
+                            Order = index
+                        }).ToList();
                 }
             }
-            
-            strategy.UpdatedAt = DateTime.UtcNow;
-            await _strategyRepository.UpdateAsync(strategy, cancellationToken);
-            return RedirectToAction(nameof(Index));
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error parsing conditions JSON: {ConditionsJson}", conditionsJson);
+                ModelState.AddModelError("", $"Error parsing conditions: {ex.Message}");
+            }
+        }
+        
+        // Validate that we have at least one alert
+        if (strategy.Alerts.Count == 0)
+        {
+            ModelState.AddModelError("", "At least one alert criteria is required.");
+        }
+        
+        // Validate final action
+        if (string.IsNullOrEmpty(finalAction) || !Enum.TryParse<TradeAction>(finalAction, out var action))
+        {
+            ModelState.AddModelError("", "A strategy action (Buy or Sell) is required.");
+        }
+        else
+        {
+            strategy.FinalAction = action;
+        }
+        
+        // Validate Timeframe
+        if (strategy.Timeframe == null)
+        {
+            ModelState.AddModelError("Timeframe", "Timeframe is required.");
+        }
+        
+        if (ModelState.IsValid)
+        {
+            try
+            {
+                strategy.UpdatedAt = DateTime.UtcNow;
+                await _strategyRepository.UpdateAsync(strategy, cancellationToken);
+                TempData["Message"] = "Strategy updated successfully.";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating strategy");
+                ModelState.AddModelError("", $"Error updating strategy: {ex.Message}");
+            }
+        }
+        
+        // Log ModelState errors for debugging
+        foreach (var error in ModelState)
+        {
+            foreach (var errorMessage in error.Value.Errors)
+            {
+                _logger.LogWarning("ModelState Error - {Key}: {Message}", error.Key, errorMessage.ErrorMessage);
+            }
         }
         
         return View(strategy);

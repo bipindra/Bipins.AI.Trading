@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Serilog;
+using System.Data.Common;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +19,7 @@ builder.Host.UseSerilog((context, configuration) =>
 // Add services to the container
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
+builder.Services.AddHttpClient(); // Required for Bipins.AI vector store providers
 
 // Add Entity Framework
 builder.Services.AddDbContext<TradingDbContext>(options =>
@@ -108,6 +110,39 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<TradingDbContext>();
     dbContext.Database.EnsureCreated();
+    
+    // Add FinalAction column if it doesn't exist (migration for existing databases)
+    try
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        await connection.OpenAsync();
+        using var command = connection.CreateCommand();
+        
+        // Check if FinalAction column exists
+        command.CommandText = "PRAGMA table_info(Strategies);";
+        using var reader = await command.ExecuteReaderAsync();
+        var columns = new List<string>();
+        while (await reader.ReadAsync())
+        {
+            columns.Add(reader.GetString(1)); // Column name is at index 1
+        }
+        await reader.CloseAsync();
+        
+        // Add FinalAction column if it doesn't exist
+        if (!columns.Contains("FinalAction", StringComparer.OrdinalIgnoreCase))
+        {
+            command.CommandText = "ALTER TABLE Strategies ADD COLUMN FinalAction TEXT;";
+            await command.ExecuteNonQueryAsync();
+        }
+        
+        await connection.CloseAsync();
+    }
+    catch (Exception ex)
+    {
+        // Log but don't fail startup - column might already exist or table might not exist yet
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogWarning(ex, "Could not add FinalAction column. It may already exist or the table may not exist yet.");
+    }
     
     // Seed identity user
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();

@@ -14,4 +14,5 @@ public class Strategy
     
     public List<IndicatorAlert> Alerts { get; set; } = new();
     public List<AlertCondition> Conditions { get; set; } = new();
+    public TradeAction? FinalAction { get; set; } // Final action when all alert criteria are met
 }

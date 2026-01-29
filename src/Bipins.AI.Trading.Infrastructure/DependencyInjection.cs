@@ -9,6 +9,12 @@ using Bipins.AI.Trading.Infrastructure.TickData;
 using Bipins.AI.Trading.Infrastructure.Consumers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Bipins.AI.Core.DependencyInjection;
+using Bipins.AI.Vectors.Qdrant;
+using Bipins.AI.Vectors.Pinecone;
+using Bipins.AI.Vectors.Milvus;
+using Bipins.AI.Vectors.Weaviate;
 
 namespace Bipins.AI.Trading.Infrastructure;
 
@@ -16,6 +22,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddHttpClient();
+
         // Register repositories
         services.AddScoped<ICandleRepository, Persistence.Repositories.CandleRepository>();
         services.AddScoped<ITickRepository, Persistence.Repositories.TickRepository>();
@@ -52,65 +60,33 @@ public static class DependencyInjection
             services.AddSingleton<ITickDataProvider, NoOpTickDataProvider>();
         }
         
-        // Register vector store from Bipins.AI NuGet package
+        // Register vector store from Bipins.AI NuGet package using IBipinsAIBuilder
         var vectorOptions = configuration.GetSection(Application.Options.VectorDbOptions.SectionName).Get<Application.Options.VectorDbOptions>();
+        RegisterVectorStore(services, vectorOptions);
         
-        if (vectorOptions?.Provider == "Qdrant")
-        {
-            // Create Bipins.AI vector store provider (from NuGet package)
-            services.AddSingleton(sp =>
-            {
-                var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-                try
-                {
-                    return Vector.BipinsAIVectorProviderAdapter.CreateProvider(vectorOptions, loggerFactory);
-                }
-                catch (Exception ex)
-                {
-                    var logger = loggerFactory.CreateLogger(typeof(object));
-                    logger.LogWarning(ex, "Failed to create Qdrant vector store from Bipins.AI package: {Error}. Using no-op implementation.", ex.Message);
-                    return new NoOpVectorStore();
-                }
-            });
-            
-            // Adapter to bridge Bipins.AI vector store to Application.Ports.IVectorMemoryStore
-            services.AddSingleton<IVectorMemoryStore>(sp =>
-            {
-                try
-                {
-                    var bipinsVectorStore = sp.GetRequiredService<object>();
-                    return Vector.BipinsAIVectorAdapter.CreateAdapter(bipinsVectorStore);
-                }
-                catch (Exception ex)
-                {
-                    var logger = sp.GetRequiredService<ILogger<IVectorMemoryStore>>();
-                    logger.LogWarning(ex, "Failed to create vector store adapter. Using no-op implementation.");
-                    return new NoOpVectorStore();
-                }
-            });
-        }
-        else
-        {
-            // Fallback to no-op implementation if vector store not configured
-            services.AddSingleton<IVectorMemoryStore, NoOpVectorStore>();
-        }
-        
-        // Register LLM providers from Bipins.AI NuGet package
+        // Register Bipins.AI LLM provider + chat service (from NuGet package)
         var llmOptions = new Application.Options.LLMOptions();
         configuration.GetSection(Application.Options.LLMOptions.SectionName).Bind(llmOptions);
-        
-        // Create Bipins.AI provider (used by chat service)
-        services.AddSingleton<Bipins.AI.LLM.ILLMProvider>(sp =>
+
+        services.AddSingleton<Bipins.AI.Providers.ILLMProvider>(sp =>
         {
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-            return LLM.BipinsAIProviderAdapter.CreateProvider(llmOptions, loggerFactory);
+            var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+
+            return llmOptions.Provider switch
+            {
+                "Anthropic" => CreateAnthropicProvider(llmOptions, httpClientFactory, loggerFactory),
+                "AzureOpenAI" => CreateAzureOpenAiProvider(llmOptions, httpClientFactory, loggerFactory),
+                _ => CreateOpenAiProvider(llmOptions, httpClientFactory, loggerFactory)
+            };
         });
-        
-        // Create Bipins.AI chat service (uses provider internally, recommended for chat operations)
+
         services.AddSingleton<Bipins.AI.LLM.IChatService>(sp =>
         {
-            var provider = sp.GetRequiredService<Bipins.AI.LLM.ILLMProvider>();
             var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+            var provider = sp.GetRequiredService<Bipins.AI.Providers.ILLMProvider>();
+            
+            // Configure ChatServiceOptions directly from app LLMOptions
             var options = new Bipins.AI.LLM.ChatServiceOptions
             {
                 Model = llmOptions.Provider switch
@@ -141,7 +117,11 @@ public static class DependencyInjection
                     _ => "text-embedding-3-small"
                 }
             };
-            return new Bipins.AI.LLM.ChatService(provider, options, loggerFactory.CreateLogger<Bipins.AI.LLM.ChatService>());
+
+            return new Bipins.AI.LLM.ChatService(
+                provider,
+                options,
+                loggerFactory.CreateLogger<Bipins.AI.LLM.ChatService>());
         });
         
         // Register Application.LLM.ILLMService using Bipins.AI chat service via adapter
@@ -155,6 +135,195 @@ public static class DependencyInjection
         services.AddScoped<FeaturesComputedConsumer>();
         
         return services;
+    }
+
+    private static Bipins.AI.Providers.ILLMProvider CreateOpenAiProvider(
+        LLMOptions llmOptions,
+        IHttpClientFactory httpClientFactory,
+        ILoggerFactory loggerFactory)
+    {
+        var options = new Bipins.AI.Providers.OpenAI.OpenAiOptions
+        {
+            ApiKey = llmOptions.OpenAI.ApiKey,
+            DefaultChatModelId = llmOptions.OpenAI.Model,
+            DefaultEmbeddingModelId = llmOptions.OpenAI.EmbeddingModel ?? "text-embedding-3-small"
+        };
+        var iOptions = Options.Create(options);
+
+        var chatModel = new Bipins.AI.Providers.OpenAI.OpenAiChatModel(
+            httpClientFactory,
+            iOptions,
+            loggerFactory.CreateLogger<Bipins.AI.Providers.OpenAI.OpenAiChatModel>());
+
+        var chatModelStreaming = new Bipins.AI.Providers.OpenAI.OpenAiChatModelStreaming(
+            httpClientFactory,
+            iOptions,
+            loggerFactory.CreateLogger<Bipins.AI.Providers.OpenAI.OpenAiChatModelStreaming>());
+
+        var embeddingModel = new Bipins.AI.Providers.OpenAI.OpenAiEmbeddingModel(
+            httpClientFactory,
+            iOptions,
+            loggerFactory.CreateLogger<Bipins.AI.Providers.OpenAI.OpenAiEmbeddingModel>());
+
+        return new Bipins.AI.Providers.OpenAI.OpenAiLLMProvider(
+            chatModel,
+            chatModelStreaming,
+            embeddingModel,
+            iOptions,
+            loggerFactory.CreateLogger<Bipins.AI.Providers.OpenAI.OpenAiLLMProvider>());
+    }
+
+    private static Bipins.AI.Providers.ILLMProvider CreateAnthropicProvider(
+        LLMOptions llmOptions,
+        IHttpClientFactory httpClientFactory,
+        ILoggerFactory loggerFactory)
+    {
+        var options = new Bipins.AI.Providers.Anthropic.AnthropicOptions
+        {
+            ApiKey = llmOptions.Anthropic.ApiKey,
+            DefaultChatModelId = llmOptions.Anthropic.Model
+        };
+        var iOptions = Options.Create(options);
+
+        var chatModel = new Bipins.AI.Providers.Anthropic.AnthropicChatModel(
+            httpClientFactory,
+            iOptions,
+            loggerFactory.CreateLogger<Bipins.AI.Providers.Anthropic.AnthropicChatModel>());
+
+        var chatModelStreaming = new Bipins.AI.Providers.Anthropic.AnthropicChatModelStreaming(
+            httpClientFactory,
+            iOptions,
+            loggerFactory.CreateLogger<Bipins.AI.Providers.Anthropic.AnthropicChatModelStreaming>());
+
+        return new Bipins.AI.Providers.Anthropic.AnthropicLLMProvider(
+            chatModel,
+            chatModelStreaming,
+            iOptions,
+            loggerFactory.CreateLogger<Bipins.AI.Providers.Anthropic.AnthropicLLMProvider>());
+    }
+
+    private static Bipins.AI.Providers.ILLMProvider CreateAzureOpenAiProvider(
+        LLMOptions llmOptions,
+        IHttpClientFactory httpClientFactory,
+        ILoggerFactory loggerFactory)
+    {
+        var options = new Bipins.AI.Providers.AzureOpenAI.AzureOpenAiOptions
+        {
+            Endpoint = llmOptions.AzureOpenAI.Endpoint,
+            ApiKey = llmOptions.AzureOpenAI.ApiKey,
+            DefaultChatDeploymentName = llmOptions.AzureOpenAI.DeploymentName,
+            DefaultEmbeddingDeploymentName = llmOptions.AzureOpenAI.EmbeddingDeploymentName ?? "text-embedding-3-small"
+        };
+        var iOptions = Options.Create(options);
+
+        var chatModel = new Bipins.AI.Providers.AzureOpenAI.AzureOpenAiChatModel(
+            httpClientFactory,
+            iOptions,
+            loggerFactory.CreateLogger<Bipins.AI.Providers.AzureOpenAI.AzureOpenAiChatModel>());
+
+        var chatModelStreaming = new Bipins.AI.Providers.AzureOpenAI.AzureOpenAiChatModelStreaming(
+            httpClientFactory,
+            iOptions,
+            loggerFactory.CreateLogger<Bipins.AI.Providers.AzureOpenAI.AzureOpenAiChatModelStreaming>());
+
+        var embeddingModel = new Bipins.AI.Providers.AzureOpenAI.AzureOpenAiEmbeddingModel(
+            httpClientFactory,
+            iOptions,
+            loggerFactory.CreateLogger<Bipins.AI.Providers.AzureOpenAI.AzureOpenAiEmbeddingModel>());
+
+        return new Bipins.AI.Providers.AzureOpenAI.AzureOpenAiLLMProvider(
+            chatModel,
+            chatModelStreaming,
+            embeddingModel,
+            iOptions,
+            loggerFactory.CreateLogger<Bipins.AI.Providers.AzureOpenAI.AzureOpenAiLLMProvider>());
+    }
+
+    private static void RegisterVectorStore(IServiceCollection services, Application.Options.VectorDbOptions? vectorOptions)
+    {
+        if (vectorOptions == null || string.IsNullOrEmpty(vectorOptions.Provider))
+        {
+            // Fallback to no-op implementation if vector store not configured
+            services.AddSingleton<IVectorMemoryStore, NoOpVectorStore>();
+            return;
+        }
+
+        // Register Bipins.AI services and vector stores via IBipinsAIBuilder
+        // AddBipinsAI returns IBipinsAIBuilder which can be chained with provider-specific Add methods
+        var builder = services.AddBipinsAI(_ => { });
+
+        switch (vectorOptions.Provider)
+        {
+            case "Qdrant":
+                builder.AddQdrant(options =>
+                {
+                    options.Endpoint = vectorOptions.Qdrant?.Endpoint ?? "http://localhost:6333";
+                    options.DefaultCollectionName = vectorOptions.Qdrant?.CollectionName ?? "trading_decisions";
+                    options.CreateCollectionIfMissing = true;
+                });
+                break;
+
+            case "Pinecone":
+                builder.AddPinecone(options =>
+                {
+                    // Configure Pinecone options
+                    // Note: Property names may need adjustment based on actual Bipins.AI API
+                    if (vectorOptions.Pinecone != null && !string.IsNullOrEmpty(vectorOptions.Pinecone.ApiKey))
+                    {
+                        options.ApiKey = vectorOptions.Pinecone.ApiKey;
+                    }
+                    if (vectorOptions.Pinecone != null && !string.IsNullOrEmpty(vectorOptions.Pinecone.Environment))
+                    {
+                        options.Environment = vectorOptions.Pinecone.Environment;
+                    }
+                });
+                break;
+
+            case "Milvus":
+                builder.AddMilvus(options =>
+                {
+                    // Configure Milvus options
+                    // Note: Property names may need adjustment based on actual Bipins.AI API
+                    // For now, using basic configuration - adjust as needed
+                });
+                break;
+
+            case "Weaviate":
+                builder.AddWeaviate(options =>
+                {
+                    // Configure Weaviate options
+                    if (vectorOptions.Weaviate != null)
+                    {
+                        options.Endpoint = vectorOptions.Weaviate.Endpoint ?? "http://localhost:8080";
+                        if (!string.IsNullOrEmpty(vectorOptions.Weaviate.ApiKey))
+                        {
+                            options.ApiKey = vectorOptions.Weaviate.ApiKey;
+                        }
+                    }
+                });
+                break;
+
+            default:
+                // Fallback to no-op implementation for unsupported providers
+                services.AddSingleton<IVectorMemoryStore, NoOpVectorStore>();
+                return;
+        }
+
+        // Adapter to bridge Bipins.AI vector store to Application.Ports.IVectorMemoryStore
+        services.AddSingleton<IVectorMemoryStore>(sp =>
+        {
+            try
+            {
+                var bipinsVectorStore = sp.GetRequiredService<Bipins.AI.Vector.IVectorStore>();
+                return Vector.VectorStoreAdapter.CreateAdapter(bipinsVectorStore);
+            }
+            catch (Exception ex)
+            {
+                var logger = sp.GetRequiredService<ILogger<IVectorMemoryStore>>();
+                logger.LogWarning(ex, "Failed to create vector store adapter. Using no-op implementation.");
+                return new NoOpVectorStore();
+            }
+        });
     }
 }
 

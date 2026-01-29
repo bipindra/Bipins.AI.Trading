@@ -75,6 +75,7 @@ public class StrategyRepository : IStrategyRepository
         entity.Description = strategy.Description;
         entity.Enabled = strategy.Enabled;
         entity.Timeframe = strategy.Timeframe.Value;
+        entity.FinalAction = strategy.FinalAction?.ToString();
         entity.UpdatedAt = DateTime.UtcNow;
         
         // Remove old alerts and conditions
@@ -135,7 +136,7 @@ public class StrategyRepository : IStrategyRepository
             .OrderBy(c => c.Order)
             .ToList();
         
-        return new Strategy
+        var strategy = new Strategy
         {
             Id = entity.StrategyId,
             Name = entity.Name,
@@ -147,6 +148,14 @@ public class StrategyRepository : IStrategyRepository
             Alerts = alerts.Select(MapAlertToDomain).ToList(),
             Conditions = conditions.Select(MapConditionToDomain).ToList()
         };
+        
+        // Map FinalAction
+        if (!string.IsNullOrEmpty(entity.FinalAction) && Enum.TryParse<TradeAction>(entity.FinalAction, out var finalAction))
+        {
+            strategy.FinalAction = finalAction;
+        }
+        
+        return strategy;
     }
     
     private IndicatorAlert MapAlertToDomain(IndicatorAlertEntity entity)
@@ -190,6 +199,7 @@ public class StrategyRepository : IStrategyRepository
             Description = strategy.Description,
             Enabled = strategy.Enabled,
             Timeframe = strategy.Timeframe.Value,
+            FinalAction = strategy.FinalAction?.ToString(),
             CreatedAt = strategy.CreatedAt,
             UpdatedAt = strategy.UpdatedAt ?? DateTime.UtcNow
         };

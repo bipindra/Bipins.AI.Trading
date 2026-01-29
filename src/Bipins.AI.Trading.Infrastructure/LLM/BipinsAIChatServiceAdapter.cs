@@ -1,5 +1,6 @@
 // Adapter to bridge Bipins.AI.LLM.IChatService to Application.LLM.ILLMService
 
+using System.Text.Json;
 using AppLLM = Bipins.AI.Trading.Application.LLM;
 
 namespace Bipins.AI.Trading.Infrastructure.LLM;
@@ -24,24 +25,24 @@ public class BipinsAIChatServiceAdapter : AppLLM.ILLMService
         List<AppLLM.FunctionDefinition> functions,
         CancellationToken cancellationToken = default)
     {
-        var bipinsFunctions = functions.Select(f => new Bipins.AI.LLM.FunctionDefinition
-        {
-            Name = f.Name,
-            Description = f.Description,
-            Parameters = f.Parameters
-        }).ToList();
-        
-        var response = await _bipinsChatService.ChatWithFunctionsAsync(systemPrompt, userMessage, bipinsFunctions, cancellationToken);
-        
+        var tools = functions.Select(f =>
+            new Bipins.AI.Core.Models.ToolDefinition(
+                f.Name,
+                f.Description,
+                JsonSerializer.SerializeToElement(f.Parameters)))
+            .ToList();
+
+        var response = await _bipinsChatService.ChatWithToolsAsync(systemPrompt, userMessage, tools, cancellationToken);
+
         return new AppLLM.LLMResponse
         {
             Content = response.Content,
-            Model = response.Model,
-            TokensUsed = response.TokensUsed,
-            FunctionCalls = response.FunctionCalls?.Select(fc => new AppLLM.FunctionCall
+            Model = response.ModelId,
+            TokensUsed = response.Usage.TotalTokens,
+            FunctionCalls = response.ToolCalls?.Select(tc => new AppLLM.FunctionCall
             {
-                Name = fc.Name,
-                Arguments = fc.Arguments
+                Name = tc.Name,
+                Arguments = tc.Arguments.GetRawText()
             }).ToList(),
             FinishReason = response.FinishReason
         };
